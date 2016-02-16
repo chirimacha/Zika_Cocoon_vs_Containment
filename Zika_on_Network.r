@@ -2,7 +2,7 @@
 #  Lots of R packages for graphs
 #	these are described in a CRAN task view here:
 #	http://cran.r-project.org/web/views/gR.html
-#	-we willl use the 'network' package
+#	-install the 'network' package
 #===================================================================================
 
 #install.packages("network")
@@ -27,6 +27,7 @@ R<-rep(0,L)
 #	-NEIGH_NET is the same saved as a network
 #   note: this leaves the ends with fewer connections
 #===================================================================================
+
 NEIGH<-matrix(0,L,L)  #set up an empty matrix
 numneigh<-3        #define the number of neighbors to connect
 
@@ -50,6 +51,7 @@ NEIGH_NET<-network(NEIGH, directed=FALSE)
 #===================================================================================
 
 connectivity<-.01
+
 LD<-matrix(rbinom(L^2,1,connectivity),L)
 for( i in 1:L)
     {
@@ -62,12 +64,14 @@ LD_NET<-network(LD, directed=FALSE)
 
 #===================================================================================
 #	create a single connection network out of NEIGH and LD
+#   -ALL_NET is the matrix
+#   -NET is the network
 #===================================================================================
+
 ALL_NET<-NEIGH+LD>0  #the unity of connections from long and neighborhood connections
 ALL_NET<-ALL_NET*1       #so that NET is displayed in 0 and 1s
 NET<-network(ALL_NET, directed=FALSE)
 
-#
 
 #===================================================================================
 #	Plotting functions
@@ -103,6 +107,7 @@ visualize_nodes<-function()
 #	-Set up Simulation 
 #	-S,E,I,R vectors
 #===================================================================================
+
 setup<-function()
 	{
 	S<<-rep(1,L)
@@ -111,6 +116,7 @@ setup<-function()
 	R<<-rep(0,L)
 	recoverday<<-rep(0,L)
 	}
+
 #===================================================================================
 #	Key functions of stochastic simulation
 #	-infect changes I from 0 to 1, also changes E and S to 0
@@ -138,7 +144,7 @@ expose<-function()
 	   index<-rowSums(ALL_NET[,cases])>=1
 	   }
        
-	index<- index & !R # recovered are not really exposed
+	index<- index & !R # recovered are not exposed assuming immunity at least over time period
 	E[index]<<-1
 	E[cases]<<-0
 	S[index]<<-0
@@ -154,18 +160,17 @@ recover<-function(node)
 	}
 
 
-
 #===================================================================================
-#	Simulation Setup
+#	Simulation setup
 #	-reps: define how many time steps
 #	-setup()  set S to 1, I, E, R to 0
 #	-PREV: an empty vector to keep track of prevalence at each timestep
-#	-par sets up a plot window. par(ask=TRUE) requires a <Enter> between plots (slows sown our movie)
+#	-par sets up a plot window. par(ask=TRUE) requires a <Enter> between plots (for a movie)
 #	-b : probaility infection given exposure / time step (ie rate)
 #	-duration : number of days infectious
-#	-Assign an index case
+#	-Assign index cases
 #	-infect it with infect()
-#	-expose its neighbors with expose()
+#	-expose its neighbors and long distance contacts with expose()
 #===================================================================================
 
 #define the length in days of the simulation
@@ -223,12 +228,3 @@ plot(PREV,typ="l", ylab="Prevalence",xlab="Time step",ylim=c(0,1))
 
 
 
-
-
-
-
-{
-	
-	text(ulong[epi[i]],ulat[epi[i]],labels=IntroT[i],col="blue",cex=1,pch=19)
-	
-}
