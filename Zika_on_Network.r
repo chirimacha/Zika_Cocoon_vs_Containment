@@ -14,7 +14,7 @@ library(network)
 #	-Simulated population parameters
 #===================================================================================
 
-L<-num_obs<-200  #number of households and individuals
+L<-num_obs<-100  #number of households and individuals
 S<-rep(1,L)
 E<-rep(0,L)
 I<-rep(0,L)
@@ -71,6 +71,40 @@ LD_NET<-network(LD, directed=FALSE)
 ALL_NET<-NEIGH+LD>0  #the unity of connections from long and neighborhood connections
 ALL_NET<-ALL_NET*1       #so that NET is displayed in 0 and 1s
 NET<-network(ALL_NET, directed=FALSE)
+
+
+
+
+#===================================================================================
+#	Risk matrix, incorporating potential interventions
+#       -RISK is the probability of infection among connection
+#   Interventions:
+#       -contain: an option to decrease risk for some columns which are assumed to report infection
+#           -identification: % of cases identified in time to attempt containment
+#           -participation: % of contacts of the node for whom risk will be reduced
+#           -reduction: degree by which risk will be reduce, multiplicative
+#===================================================================================
+
+
+
+getrisk<-function(b, contain=FALSE, cocoon=FALSE)
+    {
+    RISK<-b*NEIGH
+    
+    if(contain==TRUE)
+	   {
+        identified<-sample(L, round(L*identification))    #randomly selects individuals that would present in time for ring treatment
+        participants<-sample(L, round(L*participation))    #randomly selects those who would participate in ring treatment
+
+            for (j in identified)
+                {
+                RISK[participants,j]<- RISK[participants,j]*reduction
+                }
+        }
+    RISK<-RISK+(b*LD)       #add back the long distance risk that is not affected by containment
+    return(RISK)
+    }
+
 
 
 #===================================================================================
@@ -182,12 +216,6 @@ i<-1
 #an empty vector to store the prevalence over the course of the simulation
 PREV<-rep(0,reps)
 
-#probability of infection in exposed node per time step
-b <-.05
-
-#duration of infectiousness
-duration<-5
-
 #sets the whole populations to susceptible
 setup()
 
@@ -205,6 +233,88 @@ par(ask=FALSE)
 visualize_net()
 
 
+
+#probability of infection in exposed node per time step
+b <-.1
+
+#duration of infectiousness
+duration<-5
+
+#containment parameters
+identification<-.5
+participation<-.6
+reduction<-.4
+
+
+#create the risk matrix
+RISK<-getrisk(b, contain=TRUE, cocoon=FALSE)
+
+
+
+
+#===================================================================================
+#	Watch a single simulation
+#	-reps: define how many time steps
+#	-outputs a movie 
+#	-plots prevalence over time
+#===================================================================================
+#define the length in days of the simulation
+reps<-100
+
+#set time to day 1
+i<-1
+
+#an empty vector to store the prevalence over the course of the simulation
+PREV<-rep(0,reps)
+
+#sets the whole populations to susceptible
+setup()
+
+#set how many index cases and draw them randomly
+index<-index_case<-sample(L,5)
+
+#infect the index cases
+infect(index_case)
+
+
+#probability of infection in exposed node per time step
+b <-.1
+
+#duration of infectiousness
+duration<-5
+
+#containment parameters
+identification<-.5
+participation<-.6
+reduction<-.4
+
+
+#create the risk matrix
+RISK<-getrisk(b, contain=TRUE, cocoon=FALSE)
+
+
+#plot the starting conditions
+par(ask=FALSE)
+visualize_net()
+
+    for(i in 2:reps)
+    {
+        random<-matrix(runif(L*L),L,L)  #draw a random number matrix for stochastic infection
+        risk<-E*RISK		#multiplying risk matrix by the exposed vector
+        toinfect<-which(rowSums(random<risk)>0)
+        infect(toinfect)
+        recover(which(recoverday==i))
+        expose()
+        visualize_nodes()   #plot the current state of the network
+        PREV[i]<-sum(I)/L   #store the prevalence at time i
+        #CUMULPREV <- sum(I+R)/L
+    }
+
+plot(PREV,typ="l", ylab="Prevalence",xlab="Time step",ylim=c(0,1))
+
+
+
+
 #===================================================================================
 #	Simulation loop
 #	-reps: define how many time steps
@@ -212,17 +322,64 @@ visualize_net()
 #	-plots prevalence over time
 #===================================================================================
 
+dosim<-function()
+{
+    for(i in 2:reps)
+    {
+        random<-matrix(runif(L*L),L,L)  #draw a random number matrix for stochastic infection
+        risk<-E*RISK		#multiplying risk matrix by the exposed vector
+        toinfect<-which(rowSums(random<risk)>0)
+        infect(toinfect)
+        recover(which(recoverday==i))
+        expose()
+        #visualize_nodes()   #plot the current state of the network
+        PREV[i]<-sum(I)/L   #store the prevalence at time i
+        return(PREV)
+        #CUMULPREV <- sum(I+R)/L
+    }
+}
+
+sims<-60
+Ps<-matrix(NA,reps,sims)
+for (x in 1:sims)
+{
+    Ps[,x]<-dosim()
+}
+
+matplot(1:reps, Ps, type = "l", xlab = "Time", ylab = "Prevalence", main = "", lwd = 1, lty = 1, bty = "l", col = "blue")
+
+
+plot(PREV,typ="l", ylab="Prevalence",xlab="Time step",ylim=c(0,1))
+
+
+
+
+
+
+
+
+
+#---------old below
+
+
+#===================================================================================
+#	Simple Simulation loop
+#	-reps: define how many time steps
+#	-outputs a movie (currently commented out)
+#	-plots prevalence over time
+#===================================================================================
+
 for(i in 2:reps)
-	{
-	random<-runif(L)
-	risk<-E*b		#multiplying the risk by whether or not expsoed
-	infect(random<risk)
-	recover(which(recoverday==i))
-	expose()
+{
+    random<-runif(L)
+    risk<-E*b		#multiplying the risk by whether or not exposed
+    infect(random<risk)
+    recover(which(recoverday==i))
+    expose()
     visualize_nodes()   #plot the current state of the network
     PREV[i]<-sum(I)/L   #store the prevalence at time i
     #CUMULPREV <- sum(I+R)/L
-	}
+}
 
 plot(PREV,typ="l", ylab="Prevalence",xlab="Time step",ylim=c(0,1))
 
