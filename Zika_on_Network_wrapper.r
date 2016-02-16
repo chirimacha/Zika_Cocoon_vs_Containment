@@ -332,6 +332,7 @@ matplot(1:endtime, contained, type = "l", xlab = "Time", ylab = "Prevalence", ma
 lines(rowMeans(baseline),col="black", lwd=3)
 lines(rowMeans(contained),col="blue", lwd=3)
 
+legend(60, .25, c("containment", "baseline"), pch = 18, col = c("blue","black"))
 
 
 
