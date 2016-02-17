@@ -8,6 +8,8 @@
 #install.packages("network")
 library(network)
 #help("network-package")
+install.packages("animation")
+library(animation)
 
 
 #===================================================================================
@@ -42,6 +44,7 @@ for( i in numneigh:L-numneigh)
 diag(NEIGH)<-0
 
 NEIGH_NET<-network(NEIGH, directed=FALSE)
+plot(NEIGH_NET)
 
 #===================================================================================
 #	Model long-distance connections
@@ -50,7 +53,7 @@ NEIGH_NET<-network(NEIGH, directed=FALSE)
 #   -LD_NET is the network
 #===================================================================================
 
-connectivity<-.01
+connectivity<-.02
 
 LD<-matrix(rbinom(L^2,1,connectivity),L)
 for( i in 1:L)
@@ -220,7 +223,7 @@ PREV<-rep(0,reps)
 setup()
 
 #set how many index cases and draw them randomly
-index<-index_case<-sample(L,5)
+index<-index_case<-sample(L,3)
 
 #infect the index cases
 infect(index_case)
@@ -231,23 +234,6 @@ expose()
 #plot the starting conditions
 par(ask=FALSE)
 visualize_net()
-
-
-
-#probability of infection in exposed node per time step
-b <-.1
-
-#duration of infectiousness
-duration<-5
-
-#containment parameters
-identification<-.5
-participation<-.6
-reduction<-.4
-
-
-#create the risk matrix
-RISK<-getrisk(b, contain=TRUE, cocoon=FALSE)
 
 
 
@@ -276,9 +262,11 @@ index<-index_case<-sample(L,5)
 #infect the index cases
 infect(index_case)
 
+#expose those nodes connected to the index cases
+expose()
 
 #probability of infection in exposed node per time step
-b <-.1
+b <-.01
 
 #duration of infectiousness
 duration<-5
@@ -297,6 +285,9 @@ RISK<-getrisk(b, contain=TRUE, cocoon=FALSE)
 par(ask=FALSE)
 visualize_net()
 
+#add a pause in the animation
+oopt = ani.options(interval = .2)
+
     for(i in 2:reps)
     {
         random<-matrix(runif(L*L),L,L)  #draw a random number matrix for stochastic infection
@@ -307,11 +298,21 @@ visualize_net()
         expose()
         visualize_nodes()   #plot the current state of the network
         PREV[i]<-sum(I)/L   #store the prevalence at time i
-        #CUMULPREV <- sum(I+R)/L
+        ani.pause()         #add a pause for the movie
     }
 
 plot(PREV,typ="l", ylab="Prevalence",xlab="Time step",ylim=c(0,1))
 
+
+
+
+
+
+
+
+
+
+#---------old below
 
 
 
@@ -359,7 +360,7 @@ plot(PREV,typ="l", ylab="Prevalence",xlab="Time step",ylim=c(0,1))
 
 
 
-#---------old below
+
 
 
 #===================================================================================

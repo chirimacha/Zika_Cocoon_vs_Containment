@@ -93,10 +93,13 @@ getALL_NET<-function(NEIGH,LD)
 #           -identification: % of cases identified in time to attempt containment
 #           -participation: % of contacts of the node for whom risk will be reduced
 #           -reduction: degree by which risk will be reduce, multiplicative
+#       -cocoon (or any intervention trying to protect mother)
+#           -cocoonable: % of mothers that could realistically be protected in time
+#           -protection: Average reduction in risk to those protected (includes participation in protection efforts)
 #===================================================================================
 
 
-getrisk<-function(b, reduction=.4, identification=.5, participation=.6,contain=FALSE, cocoon=FALSE)
+getrisk<-function(b, reduction=.4, identification=.5, participation=.6, cocoonable=.3, protection=.6, contain=FALSE, cocoon=FALSE)
     {
     RISK<-b*NEIGH
     
@@ -111,6 +114,17 @@ getrisk<-function(b, reduction=.4, identification=.5, participation=.6,contain=F
                 }
         }
     RISK<-RISK+(b*LD)       #add back the long distance risk that is not affected by containment
+    
+    if(cocoon==TRUE)
+	   {
+           cocoons<-sample(L, round(L*cocoonable))    #randomly selects individuals that could be protected
+           
+           for (j in cocoons)
+           {
+               RISK[,j]<- RISK[,j]*protection
+           }
+       }
+    
     return(RISK)
     }
 
@@ -263,10 +277,10 @@ RISK<-getrisk(b, reduction=.4, contain=TRUE, cocoon=FALSE)
 #	-plots prevalence over time
 #===================================================================================
 
-dosim<-function(endtime=100, L=100, numneigh=3, cont= FALSE, connectivity=.1, index_cases=5, b=.1, duration=5, identification=.5, participation=.6, reduction=.4)
+dosim<-function(endtime=100, L=200, numneigh=3, cont= FALSE, coco=FALSE, connectivity=.01, index_cases=3, b=.01, duration=2, identification=1, participation=1, reduction=.2,cocoonable=.1, protection=.6)
     {
         #reset the population vectors
-            i<-1
+            i<<-1
             L<<-L
             setup()
             PREV<-rep(0,endtime)  #empty vector
@@ -275,37 +289,36 @@ dosim<-function(endtime=100, L=100, numneigh=3, cont= FALSE, connectivity=.1, in
             NEIGH<<-getNEIGH(L, numneigh)
             LD<<-getLD(L, connectivity)
             ALL_NET<<-getALL_NET(NEIGH,LD)
-            RISK<<-getrisk(b, reduction=reduction, contain=cont, cocoon=FALSE)
+            RISK<<-getrisk(b, reduction=.4, identification=.5, participation=.6, cocoonable=.3, protection=.6, contain=cont, cocoon=coco)
             
         #seed the epidemic
             index<-index_case<-sample(L,index_cases)
-            infect(index_case)  #infect the index cases
-            expose()    #expose nodes connected to index cases
+            infect(index_case)                      # infect the index cases
+            expose()                                # expose nodes connected to index cases
        
-             #simulate the epidemic
-       for(i in 2:endtime)
-            {
-                
-                random<-matrix(runif(L*L),L,L)  #draw a random number matrix for stochastic infection
-                risk<-E*RISK		#multiplying risk matrix by the exposed vector
-                toinfect<-which(rowSums(random<risk)>0)
-                infect(toinfect,day=i)
-                recover(which(recoverday==i))
-                expose()
-                PREV[i]<-sum(I)/L   #store the prevalence at time i
-            }
-        return(PREV)
+        #simulate the epidemic
+           for(i in 2:endtime)
+                {
+                    
+                    random<-matrix(runif(L*L),L,L)  # draw a random number matrix for stochastic infection
+                    risk<-E*RISK                    # multiplying risk matrix by the exposed vector
+                    toinfect<-which(rowSums(random<risk)>0)
+                    infect(toinfect,day=i)
+                    recover(which(recoverday==i))
+                    expose()
+                    PREV[i]<-sum(I)/L               # store the prevalence at time i
+                }
+            return(PREV)
     }
 
-sims<-100
 
-
+sims<-30
 
 #no containment
 baseline<-matrix(NA,reps,sims)
 for (x in 1:sims)
     {
-        baseline[,x]<-dosim(endtime=100, L=200, numneigh=3, cont= FALSE, connectivity=.01, index_cases=3, b=.01, duration=2, identification=0, participation=0, reduction=0)
+        baseline[,x]<-dosim(cont= FALSE, coco=FALSE)
     }
 
 
@@ -314,7 +327,22 @@ for (x in 1:sims)
 contained<-matrix(NA,reps,sims)
 for (x in 1:sims)
     {
-        contained[,x]<-dosim(endtime=100, L=200, numneigh=3, cont= TRUE, connectivity=.01, index_cases=3, b=.01, duration=2, identification=1, participation=1, reduction=.2)
+        contained[,x]<-dosim(cont= TRUE, coco=FALSE)
+    }
+
+
+#cocoon
+cocooned<-matrix(NA,reps,sims)
+for (x in 1:sims)
+    {
+        cocooned[,x]<-dosim(cont= FALSE, coco=TRUE)
+    }
+
+#both
+both<-matrix(NA,reps,sims)
+for (x in 1:sims)
+    {
+        both[,x]<-dosim(cont= TRUE, coco=TRUE)
     }
 
 #===================================================================================
@@ -326,42 +354,16 @@ for (x in 1:sims)
 
 #plots
 matplot(1:endtime, baseline, type = "l", xlab = "Time", ylab = "Prevalence", main = "", lwd = .1, lty = 1, bty = "l", col = "black")
-
 matplot(1:endtime, contained, type = "l", xlab = "Time", ylab = "Prevalence", main = "", lwd = .1, lty = 1, bty = "l", col = "blue", add=TRUE)
+matplot(1:endtime, cocooned, type = "l", xlab = "Time", ylab = "Prevalence", main = "", lwd = .1, lty = 1, bty = "l", col = "purple", add=TRUE)
+matplot(1:endtime, both, type = "l", xlab = "Time", ylab = "Prevalence", main = "", lwd = .1, lty = 1, bty = "l", col = "red", add=TRUE)
 
+#show the means for each set of simulations
 lines(rowMeans(baseline),col="black", lwd=3)
 lines(rowMeans(contained),col="blue", lwd=3)
-
-legend(60, .25, c("containment", "baseline"), pch = 18, col = c("blue","black"))
-
-
-
-
-
-
-#---------old below
-
-
-#===================================================================================
-#	Simple Simulation loop
-#	-reps: define how many time steps
-#	-outputs a movie (currently commented out)
-#	-plots prevalence over time
-#===================================================================================
-
-for(i in 2:reps)
-{
-    random<-runif(L)
-    risk<-E*b		#multiplying the risk by whether or not exposed
-    infect(random<risk)
-    recover(which(recoverday==i))
-    expose()
-    visualize_nodes()   #plot the current state of the network
-    PREV[i]<-sum(I)/L   #store the prevalence at time i
-    #CUMULPREV <- sum(I+R)/L
-}
-
-plot(PREV,typ="l", ylab="Prevalence",xlab="Time step",ylim=c(0,1))
+lines(rowMeans(cocooned),col="purple", lwd=3)
+lines(rowMeans(both),col="red", lwd=3)
+legend(60, .25, c("baseline", "containment", "cocooning", "both"), pch = 18, col = c("black", "blue", "purple", "red"))
 
 
 
