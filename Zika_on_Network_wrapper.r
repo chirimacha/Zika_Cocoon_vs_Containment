@@ -20,13 +20,24 @@ getNEIGH<-function(L,numneigh)
     NEIGH<-matrix(0,L,L)  #set up an empty matrix
    
 
-    for( i in numneigh:L-numneigh)
+    for( i in numneigh:(L-numneigh))
         {
             for (o in 1:numneigh)
             {
         NEIGH[i,i-o]<-1
         NEIGH[i,i+o]<-1
             }
+        }
+        
+    for(i in 1:numneigh)
+        {
+            for (o in 1:numneigh)
+                {
+                    NEIGH[i,o]<-1
+                    NEIGH[(L+1)-i,(L+1)-o]<-1
+                    NEIGH[(L+1)-i,o]<-1
+                    NEIGH[i, (L+1)-o]<-1
+                }
         }
     diag(NEIGH)<-0
     return(NEIGH)
@@ -336,7 +347,7 @@ legend(60, max(baseline), c("baseline", "containment", "cocooning", "both"), pch
 #   -Visualize_net shows the network of local and longdistnace contacts
 #===================================================================================
 par(ask=FALSE)
-visualize_net(ALL_NET)
+visualize_net(network(ALL_NET, directed=FALSE))
 
 
 
