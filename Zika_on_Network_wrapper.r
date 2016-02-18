@@ -7,18 +7,6 @@
 
 #install.packages("network")
 library(network)
-#help("network-package")
-
-
-#===================================================================================
-#	-Simulated population parameters
-#===================================================================================
-
-L<-num_obs<-100  #number of households and individuals
-S<-rep(1,L)
-E<-rep(0,L)
-I<-rep(0,L)
-R<-rep(0,L)
 
 
 #===================================================================================
@@ -138,11 +126,12 @@ getrisk<-function(b, reduction=.4, identification=.5, participation=.6, cocoonab
 #===================================================================================
 
 
-COORDS<-plot(NET,vertex.col="black")
-COLS<-rep(1,L)
 
-visualize_net<-function()
+
+visualize_net<-function(NET)
 	{
+    COORDS<<-plot(NET,vertex.col="black")
+    COLS<<-rep(1,L)
 	COLS[I==1]<-"red"
 	COLS[E==1]<-"orange"
 	COLS[S==1]<-"black"
@@ -172,6 +161,7 @@ setup<-function()
 	I<<-rep(0,L)
 	R<<-rep(0,L)
 	recoverday<<-rep(0,L)
+    cases<<-NA
 	}
 
 #===================================================================================
@@ -179,7 +169,7 @@ setup<-function()
 #	-infect changes I from 0 to 1, also changes E and S to 0
 #===================================================================================
 
-infect<-function(node,day=i)
+infect<-function(node, day=i)
 	{
         I[node]<<-1
         E[node]<<-0
@@ -192,18 +182,20 @@ expose<-function()
 	{
         if(length(cases==1))
            {
-           index<-ALL_NET[,cases]==1
+               temp<-ALL_NET[,cases]==1
            }
            
         if(length(cases)>1)
            {
-           index<-rowSums(ALL_NET[,cases])>=1
+               temp<-rowSums(ALL_NET[,cases])>=1
            }
-           
-        index<- index & !R # recovered are not exposed assuming immunity at least over time period
-        E[index]<<-1
-        E[cases]<<-0
-        S[index]<<-0
+        if(length(temp>=1))
+            {
+                temp <- temp & !R # recovered are not exposed assuming immunity at least over time period
+                E[temp]<<-1
+                E[cases]<<-0
+                S[temp]<<-0
+            }
 	}
 
 recover<-function(node)
@@ -217,17 +209,152 @@ recover<-function(node)
 
 
 #===================================================================================
-#	Simulation setup
-#	-reps: define how many time steps
-#	-setup()  set S to 1, I, E, R to 0
-#	-PREV: an empty vector to keep track of prevalence at each timestep
-#	-par sets up a plot window. par(ask=TRUE) requires a <Enter> between plots (for a movie)
-#	-b : probaility infection given exposure / time step (ie rate)
-#	-duration : number of days infectious
-#	-Assign index cases
-#	-infect it with infect()
-#	-expose its neighbors and long distance contacts with expose()
+#	Simulation function
+#   Parameters:
+#       -b : probaility infection given exposure / time step (ie rate)
+#       -endtime: number of time steps in simulation
+#       -index_cases: the # of cases at timepoint 1
+#       -connectivity % of population that comes into relevant contact. Note this scales with L, the population size
+#       -numneigh Number of neighboring nodes a cases will expose, also the number that might be treated in containment. Currently the number is doubled as the simulation is 2 dimensional (a 3 means 6 nodes will be exposed)
+#       -coco : whether a cocoon strategy is attempted
+#       -cont : whether a containment strategy is attempted
+#       -identification, participation, reduction, coconnable, protection (see the Risk Matrix function above)
 #===================================================================================
+
+dosim<-function(cont= FALSE, coco=FALSE, index_cases=1, numneigh=3, connectivity=.01, b=.01, identification=1, participation=1, reduction=0,cocoonable=.1, protection=.6)
+    {
+        #reset the population vectors
+            i<<-1
+            setup()
+            PREV<<-temp<<-rep(0,endtime)  #empty vector
+        
+        #create the exposure and risk matrices
+            NEIGH<<-getNEIGH(L, numneigh)
+            LD<<-getLD(L, connectivity)
+            ALL_NET<<-getALL_NET(NEIGH,LD)
+
+            RISK<<-getrisk(b, reduction=reduction, identification=identification, participation=participation, cocoonable=cocoonable, protection=protection, contain=cont, cocoon=coco)
+            
+        #seed the epidemic
+        
+            cases<<-(sample(L,index_cases))           # infect the index cases
+            infect(cases)
+            expose()                                # expose nodes connected to index cases
+       
+        #simulate the epidemic
+           for(i in 2:endtime)
+                {
+                    
+                    random<-matrix(runif(L*L),L,L)  # draw a random number matrix for stochastic infection
+                    risk<-E*RISK                    # multiplying risk matrix by the exposed vector
+                    toinfect<-which(rowSums(random<risk)>0)
+                    infect(toinfect,day=i)
+                    recover(which(recoverday==i))
+                    expose()
+                    PREV[i]<-sum(I)/L               # store the prevalence at time i
+                }
+            return(PREV)
+    }
+
+#===================================================================================
+#   Global Parameters
+#       -sims: number of simulations per arm
+#       -duration : number of timepoints a case is infectious
+#
+#===================================================================================
+sims<-30
+endtime<-100
+L<-200
+I<-rep(0,L)     #allows use of the symbol I for infectious and sets it to zero
+duration<-2
+
+#no containment
+baseline<-matrix(NA,endtime,sims)
+for (x in 1:sims)
+    {
+        baseline[,x]<-dosim(cont= FALSE, coco=FALSE)
+    }
+
+
+
+#containment
+contained<-matrix(NA,endtime,sims)
+for (x in 1:sims)
+    {
+        contained[,x]<-dosim(cont= TRUE, coco=FALSE)
+    }
+
+
+#cocoon
+cocooned<-matrix(NA,endtime,sims)
+for (x in 1:sims)
+    {
+        cocooned[,x]<-dosim(cont= FALSE, coco=TRUE)
+    }
+
+#both
+both<-matrix(NA,endtime,sims)
+for (x in 1:sims)
+    {
+        both[,x]<-dosim(cont= TRUE, coco=TRUE)
+    }
+
+#===================================================================================
+#	Visualize the results
+#	-black lines: simulations with no interventions
+#	-blue lines: Simulaitons with containment
+#   -purple lines: simulations with cocooning
+#   -red lines: simulations with both containment and cocooning
+#
+#   -Thicker lines are means across the simulations in each arm
+#===================================================================================
+
+
+#plots of each simulation
+quartz()
+matplot(1:endtime, baseline, type = "l", xlab = "Time", ylab = "Prevalence", main = "", lwd = .1, lty = 1, bty = "l", col = "black")
+matplot(1:endtime, contained, type = "l", xlab = "Time", ylab = "Prevalence", main = "", lwd = .1, lty = 1, bty = "l", col = "blue", add=TRUE)
+matplot(1:endtime, cocooned, type = "l", xlab = "Time", ylab = "Prevalence", main = "", lwd = .1, lty = 1, bty = "l", col = "purple", add=TRUE)
+matplot(1:endtime, both, type = "l", xlab = "Time", ylab = "Prevalence", main = "", lwd = .1, lty = 1, bty = "l", col = "red", add=TRUE)
+
+#show the means for each set of simulations
+lines(rowMeans(baseline),col="black", lwd=3)
+lines(rowMeans(contained),col="blue", lwd=3)
+lines(rowMeans(cocooned),col="purple", lwd=3)
+lines(rowMeans(both),col="red", lwd=3)
+legend(60, max(baseline), c("baseline", "containment", "cocooning", "both"), pch = 18, col = c("black", "blue", "purple", "red"))
+
+
+
+
+
+
+
+
+#===================================================================================
+#	-par sets up a plot window. par(ask=TRUE) requires a <Enter> between plots (for a movie)
+#   -Visualize_net shows the network of local and longdistnace contacts
+#===================================================================================
+par(ask=FALSE)
+visualize_net(ALL_NET)
+
+
+
+#####-------------old below
+
+#===================================================================================
+#	-Simulated population parameters
+#===================================================================================
+
+L<-num_obs<-100  #number of households and individuals
+S<-rep(1,L)
+E<-rep(0,L)
+I<-rep(0,L)
+R<-rep(0,L)
+
+
+
+
 
 #define the length in days of the simulation
 reps<-100
@@ -249,121 +376,6 @@ infect(index_case)
 
 #expose those nodes connected to the index cases
 expose()
-
-#plot the starting conditions
-par(ask=FALSE)
-visualize_net()
-
-
-#probability of infection in exposed node per time step
-b <-.1
-
-#duration of infectiousness
-duration<-5
-
-#containment parameters
-identification<-.5
-participation<-.6
-reduction<-.4
-
-
-#create the risk matrix
-RISK<-getrisk(b, reduction=.4, contain=TRUE, cocoon=FALSE)
-
-
-#===================================================================================
-#	Run multiple simulations
-#	-endtime: define how many time steps
-#	-plots prevalence over time
-#===================================================================================
-
-dosim<-function(endtime=100, L=200, numneigh=3, cont= FALSE, coco=FALSE, connectivity=.01, index_cases=3, b=.01, duration=2, identification=1, participation=1, reduction=.2,cocoonable=.1, protection=.6)
-    {
-        #reset the population vectors
-            i<<-1
-            L<<-L
-            setup()
-            PREV<-rep(0,endtime)  #empty vector
-        
-        #create the exposure and risk matrices
-            NEIGH<<-getNEIGH(L, numneigh)
-            LD<<-getLD(L, connectivity)
-            ALL_NET<<-getALL_NET(NEIGH,LD)
-            RISK<<-getrisk(b, reduction=.4, identification=.5, participation=.6, cocoonable=.3, protection=.6, contain=cont, cocoon=coco)
-            
-        #seed the epidemic
-            index<-index_case<-sample(L,index_cases)
-            infect(index_case)                      # infect the index cases
-            expose()                                # expose nodes connected to index cases
-       
-        #simulate the epidemic
-           for(i in 2:endtime)
-                {
-                    
-                    random<-matrix(runif(L*L),L,L)  # draw a random number matrix for stochastic infection
-                    risk<-E*RISK                    # multiplying risk matrix by the exposed vector
-                    toinfect<-which(rowSums(random<risk)>0)
-                    infect(toinfect,day=i)
-                    recover(which(recoverday==i))
-                    expose()
-                    PREV[i]<-sum(I)/L               # store the prevalence at time i
-                }
-            return(PREV)
-    }
-
-
-sims<-30
-
-#no containment
-baseline<-matrix(NA,reps,sims)
-for (x in 1:sims)
-    {
-        baseline[,x]<-dosim(cont= FALSE, coco=FALSE)
-    }
-
-
-
-#containment
-contained<-matrix(NA,reps,sims)
-for (x in 1:sims)
-    {
-        contained[,x]<-dosim(cont= TRUE, coco=FALSE)
-    }
-
-
-#cocoon
-cocooned<-matrix(NA,reps,sims)
-for (x in 1:sims)
-    {
-        cocooned[,x]<-dosim(cont= FALSE, coco=TRUE)
-    }
-
-#both
-both<-matrix(NA,reps,sims)
-for (x in 1:sims)
-    {
-        both[,x]<-dosim(cont= TRUE, coco=TRUE)
-    }
-
-#===================================================================================
-#	Visualize the results
-#	-black lines: simulations without any containment
-#	-blue lines: Simulaitons with containment
-#   Thicker lines are means across the simulations
-#===================================================================================
-
-#plots
-matplot(1:endtime, baseline, type = "l", xlab = "Time", ylab = "Prevalence", main = "", lwd = .1, lty = 1, bty = "l", col = "black")
-matplot(1:endtime, contained, type = "l", xlab = "Time", ylab = "Prevalence", main = "", lwd = .1, lty = 1, bty = "l", col = "blue", add=TRUE)
-matplot(1:endtime, cocooned, type = "l", xlab = "Time", ylab = "Prevalence", main = "", lwd = .1, lty = 1, bty = "l", col = "purple", add=TRUE)
-matplot(1:endtime, both, type = "l", xlab = "Time", ylab = "Prevalence", main = "", lwd = .1, lty = 1, bty = "l", col = "red", add=TRUE)
-
-#show the means for each set of simulations
-lines(rowMeans(baseline),col="black", lwd=3)
-lines(rowMeans(contained),col="blue", lwd=3)
-lines(rowMeans(cocooned),col="purple", lwd=3)
-lines(rowMeans(both),col="red", lwd=3)
-legend(60, .25, c("baseline", "containment", "cocooning", "both"), pch = 18, col = c("black", "blue", "purple", "red"))
 
 
 
