@@ -232,7 +232,7 @@ recover<-function(node)
 #       -identification, participation, reduction, coconnable, protection (see the Risk Matrix function above)
 #===================================================================================
 
-dosim<-function(cont= FALSE, coco=FALSE, index_cases=1, numneigh=3, connectivity=0.05, b=.01, identification=1, participation=1, reduction=0,cocoonable=.1, protection=.6)
+dosim<-function(cont= FALSE, coco=FALSE, index_cases=1, b=.01, identification=1, participation=1, reduction=0,cocoonable=.1, protection=.6)
     {
         #reset the population vectors
             i<<-1
@@ -271,7 +271,8 @@ dosim<-function(cont= FALSE, coco=FALSE, index_cases=1, numneigh=3, connectivity
 #   Global Parameters
 #       -sims: number of simulations per arm
 #       -duration : number of timepoints a case is infectious
-#
+#       -numneigh : number of neighbors in the matrix
+#       -connectivity : probability of connection with any other node in the network
 #===================================================================================
 sims<-10
 endtime<-100

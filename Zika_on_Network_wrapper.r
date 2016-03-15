@@ -232,7 +232,7 @@ recover<-function(node)
 #       -identification, participation, reduction, coconnable, protection (see the Risk Matrix function above)
 #===================================================================================
 
-dosim<-function(cont= FALSE, coco=FALSE, index_cases=1, numneigh=3, connectivity=.01, b=.01, identification=1, participation=1, reduction=0,cocoonable=.1, protection=.6)
+dosim<-function(cont= FALSE, coco=FALSE, index_cases=1, numneigh=3, connectivity=0.05, b=.01, identification=1, participation=1, reduction=0,cocoonable=.1, protection=.6)
     {
         #reset the population vectors
             i<<-1
@@ -273,7 +273,7 @@ dosim<-function(cont= FALSE, coco=FALSE, index_cases=1, numneigh=3, connectivity
 #       -duration : number of timepoints a case is infectious
 #
 #===================================================================================
-sims<-30
+sims<-10
 endtime<-100
 L<-200
 I<-rep(0,L)     #allows use of the symbol I for infectious and sets it to zero
@@ -346,6 +346,7 @@ legend(60, max(baseline), c("baseline", "containment", "cocooning", "both"), pch
 #	-par sets up a plot window. par(ask=TRUE) requires a <Enter> between plots (for a movie)
 #   -Visualize_net shows the network of local and longdistnace contacts
 #===================================================================================
+dosim(connectivity=0)
 par(ask=FALSE)
 visualize_net(network(ALL_NET, directed=FALSE))
 
